@@ -1,30 +1,23 @@
+// =====================================================
+// ТЕСТОВАЯ ВЕРСИЯ - для проверки Firebase + прямые ссылки
+// go.bestonlyfansgirl.com/slug -> открытие в Safari
+// =====================================================
+
 // Prevent page from being cached
-window.addEventListener('beforeunload', function() {
-    // This helps prevent page caching
-});
+window.addEventListener('beforeunload', function() {});
 
-// Global variables for analytics setup tracking
-let analyticsSetup = false; // Flag to prevent duplicate setup
+// Global variables
+let analyticsSetup = false;
+const API_BASE = 'https://bestonlyfansgirl.com/api/v1';
 
-// Function to setup analytics with validation
+// Function to setup analytics
 function setupAnalytics(measurementId, metaPixelId) {
-    // Prevent duplicate setup
-    if (analyticsSetup) {
-        return;
-    }
-    
-    // Add Google Analytics if provided
+    if (analyticsSetup) return;
+
     if (measurementId) {
-        // If measurementId is just numbers, add G- prefix
-        if (/^\d+$/.test(measurementId)) {
-            measurementId = 'G-' + measurementId;
-        }
-        
-        // Validate GA ID format
-        if (!/^G-[A-Z0-9]+$/.test(measurementId) && !/^UA-\d+-\d+$/.test(measurementId)) {
-            return;
-        }
-        
+        if (/^\d+$/.test(measurementId)) measurementId = 'G-' + measurementId;
+        if (!/^G-[A-Z0-9]+$/.test(measurementId) && !/^UA-\d+-\d+$/.test(measurementId)) return;
+
         const script = document.createElement('script');
         script.async = true;
         script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
@@ -34,18 +27,12 @@ function setupAnalytics(measurementId, metaPixelId) {
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
         gtag('config', measurementId);
-        
-        // Make gtag available globally for debugging
         window.gtag = gtag;
     }
 
-    // Add Meta Pixel if provided
     if (metaPixelId) {
-        // Validate Meta Pixel ID (should be numbers only)
-        if (!/^\d+$/.test(metaPixelId)) {
-            return;
-        }
-        
+        if (!/^\d+$/.test(metaPixelId)) return;
+
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -57,83 +44,108 @@ function setupAnalytics(measurementId, metaPixelId) {
 
         fbq('init', metaPixelId);
         fbq('track', 'PageView');
-
-        const noscript = document.createElement('noscript');
-        const img = document.createElement('img');
-        img.height = "1";
-        img.width = "1";
-        img.style.display = "none";
-        img.src = `https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1`;
-        noscript.appendChild(img);
-        document.head.appendChild(noscript);
-        
-        // Make fbq available globally for debugging
         window.fbq = fbq;
     }
-    
-    // Mark analytics as setup to prevent duplicates
+
     analyticsSetup = true;
 }
 
-// Function to handle the redirect logic
-function handleRedirectLogic() {
+// Get slug from pathname
+function getSlugFromPath() {
+    const path = window.location.pathname;
+    // Remove leading slash and get first segment
+    const slug = path.replace(/^\//, '').split('/')[0];
+    // Skip if it's a known file
+    if (!slug || slug === 'deeplink.html' || slug.includes('.')) {
+        return null;
+    }
+    return slug;
+}
+
+// Check if path is a subreddit deeplink (/r/subreddit-slug)
+function isSubredditPath() {
+    const path = window.location.pathname;
+    // Match /r/something or /r/r-something
+    return /^\/r\//.test(path);
+}
+
+// Get subreddit slug from path (/r/subreddit-slug -> subreddit-slug)
+function getSubredditSlugFromPath() {
+    const path = window.location.pathname;
+    const match = path.match(/^\/r\/(.+)$/);
+    return match ? match[1] : null;
+}
+
+// Fetch model data from API
+async function fetchModelData(slug) {
+    try {
+        const response = await fetch(`${API_BASE}/models/${slug}`);
+        if (!response.ok) return null;
+        const data = await response.json();
+        return data.data || data;
+    } catch (error) {
+        console.error('Failed to fetch model:', error);
+        return null;
+    }
+}
+
+// Main redirect logic
+async function handleRedirectLogic() {
     const urlParams = new URLSearchParams(window.location.search);
-    const redirectUrl = urlParams.get("destination") || "https://bestonlyfansgirl.com";
-    const deeplinkId = urlParams.get("id");
+    let redirectUrl = urlParams.get("destination");
+    let deeplinkId = urlParams.get("id");
     const measurementId = urlParams.get("ga");
     const metaPixelId = urlParams.get("pixel");
-    const backUrl = urlParams.get("backUrl");
 
-    // Setup analytics immediately
+    // SUBREDDIT PATH: /r/subreddit-slug -> redirect to backend for UTM handling
+    if (!redirectUrl && isSubredditPath()) {
+        const subredditSlug = getSubredditSlugFromPath();
+        if (subredditSlug) {
+            // Redirect to backend subreddit route which will add UTM params
+            // and redirect back to Firebase with proper destination
+            redirectUrl = `https://bestonlyfansgirl.com/go/r/${subredditSlug}`;
+            deeplinkId = `bestonlyfansgirl.com__r_${subredditSlug}`;
+        }
+    }
+
+    // If no destination in query params, try to get from slug (model)
+    if (!redirectUrl) {
+        const slug = getSlugFromPath();
+        if (slug) {
+            const model = await fetchModelData(slug);
+            if (model && model.ofUrl) {
+                redirectUrl = model.ofUrl;
+                deeplinkId = `bestonlyfansgirl.com__${slug}`;
+            }
+        }
+    }
+
+    // Fallback to homepage
+    if (!redirectUrl) {
+        redirectUrl = "https://bestonlyfansgirl.com";
+    }
+
+    // Setup analytics
     setupAnalytics(measurementId, metaPixelId);
 
-    // Back button hijacking removed from aggressive behavior to prevent double browser kicks
-
-    // No special setup needed for first-time visitors anymore
-    // Back button detection handles everything
-
-    let dl_found = false;
-
+    // Device detection
     const detectDevice = () => {
-        const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-        if (/android/i.test(userAgent)) return "android";
-        if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) return "ios";
+        const ua = navigator.userAgent || navigator.vendor || window.opera;
+        if (/android/i.test(ua)) return "android";
+        if (/iPad|iPhone|iPod/.test(ua) && !window.MSStream) return "ios";
         return "desktop";
     };
 
     const isSafari = () => {
-        const userAgent = navigator.userAgent;
-        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
-    };
-
-    const isMobileBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /CriOS|FxiOS|chrome.*mobile|firefox.*mobile|opera.*mobile/i.test(userAgent) && !/safari/i.test(userAgent);
-    };
-
-    const isFbBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /FBAN|FBAV/i.test(userAgent);
-    };
-
-    const isTelegramBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /AppleWebKit\/605\.1\.15/.test(userAgent) && 
-               /Mobile\/22E240/.test(userAgent) && 
-               /Safari\/604\.1/.test(userAgent) &&
-               !/CriOS|FxiOS/.test(userAgent);
+        const ua = navigator.userAgent;
+        return /safari/i.test(ua) && !/CriOS|FxiOS/i.test(ua);
     };
 
     const isWebView = () => {
-        const userAgent = navigator.userAgent;
+        const ua = navigator.userAgent;
         return (
             (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
-            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
-            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
-            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
-            isFbBrowser() ||
-            isTelegramBrowser() ||
-            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery/i.test(userAgent)
+            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|TikTok|Reddit|Discord|Telegram|FBAN|FBAV/i.test(ua)
         );
     };
 
@@ -147,103 +159,73 @@ function handleRedirectLogic() {
         }
     };
 
+    // Do the redirect
     const redirect = () => {
         const device = detectDevice();
-        let timeoutId, timeoutId2, timeoutId3, timeoutId4;
-
-        const formattedRedirectUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
+        const formattedUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
 
         if (device === "desktop") {
-            // Use href instead of replace to maintain history for back button hijacking
-            window.location.href = formattedRedirectUrl;
-        } else {
-            // For webviews like Snapchat, use more aggressive timing
-            const isInWebView = isWebView();
-            const baseDelay = isInWebView ? 100 : 500;
-            
-            if (device === "android") {
-                timeoutId = setTimeout(() => {
-                    intentRedirect(formattedRedirectUrl);
-                }, baseDelay);
-            } else if (!isMobileBrowser() && (!isFbBrowser() || (isFbBrowser() && device === "android"))) {
-                timeoutId = setTimeout(() => {
-                    const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                    window.location = `googlechrome://${chromeUrl}`;
-                }, baseDelay);
-            }
+            window.location.href = formattedUrl;
+            return;
+        }
 
-            if (device === "ios") {
-                if (isInWebView) {
-                    // More aggressive timing for webviews like Snapchat
-                    timeoutId = setTimeout(() => {
-                        const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                        window.location = `googlechrome://${chromeUrl}`;
-                    }, 200);
-                    
-                    timeoutId2 = setTimeout(() => {
-                        window.location = `x-safari-${formattedRedirectUrl}`;
-                    }, 400);
-                    
-                    timeoutId3 = setTimeout(() => {
-                        window.location = formattedRedirectUrl;
-                    }, 600);
-                } else {
-                    // Original timing for normal browsers
-                    timeoutId2 = setTimeout(() => {
-                        window.location = `x-safari-${formattedRedirectUrl}`;
-                    }, 500);
+        const isInWebView = isWebView();
 
-                    timeoutId3 = setTimeout(() => {
-                        if (!isSafari()) {
-                            const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                            window.location = `googlechrome://${chromeUrl}`;
-                        }
-                    }, 800);
-                    
-                    timeoutId4 = setTimeout(() => {
-                        window.location = formattedRedirectUrl;
-                    }, 1100);
-                }
-            } else if (!isInWebView) {
-                // Final fallback for non-iOS, non-webview
-                timeoutId4 = setTimeout(() => {
-                    window.location = formattedRedirectUrl;
-                }, 1100);
+        if (device === "android") {
+            setTimeout(() => intentRedirect(formattedUrl), isInWebView ? 100 : 500);
+            return;
+        }
+
+        // iOS - external URLs
+        if (device === "ios") {
+            if (isInWebView) {
+                // Aggressive timing for webviews (Reddit, Instagram, etc)
+                setTimeout(() => {
+                    window.location = `googlechrome://${formattedUrl.replace(/^https?:\/\//, '')}`;
+                }, 100);
+
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedUrl}`;
+                }, 200);
+
+                setTimeout(() => {
+                    window.location = formattedUrl;
+                }, 400);
+            } else {
+                // Normal browser
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedUrl}`;
+                }, 300);
+
+                setTimeout(() => {
+                    if (!isSafari()) {
+                        window.location = `googlechrome://${formattedUrl.replace(/^https?:\/\//, '')}`;
+                    }
+                }, 600);
+
+                setTimeout(() => {
+                    window.location = formattedUrl;
+                }, 900);
             }
         }
     };
 
-        // Start the redirect process immediately (no back button hijacking in aggressive mode)
     redirect();
 }
 
-// Run the redirect logic on both DOMContentLoaded and pageshow (for cached pages)
+// Run on page load
 document.addEventListener("DOMContentLoaded", handleRedirectLogic);
+window.addEventListener("pageshow", handleRedirectLogic);
 
-// CRITICAL: This catches when page is loaded from browser cache (back button)
-window.addEventListener("pageshow", function(event) {
-    handleRedirectLogic();
-});
-
-// Additional cache prevention
-window.addEventListener("pagehide", function() {
-    // Mark page as should not be cached
-});
-
-// Force no cache with meta tag approach
+// Cache prevention
 if (document.head) {
-    const metaNoCache = document.createElement('meta');
-    metaNoCache.httpEquiv = 'Cache-Control';
-    metaNoCache.content = 'no-cache, no-store, must-revalidate';
-    document.head.appendChild(metaNoCache);
-    
-    const metaPragma = document.createElement('meta');
-    metaPragma.httpEquiv = 'Pragma';
-    metaPragma.content = 'no-cache';
-    document.head.appendChild(metaPragma);
-    
-    const metaExpires = document.createElement('meta');
-    metaExpires.httpEquiv = 'Expires';
-    metaExpires.content = '0';
-    document.head.appendChild(metaExpires);
-} 
+    const meta1 = document.createElement('meta');
+    meta1.httpEquiv = 'Cache-Control';
+    meta1.content = 'no-cache, no-store, must-revalidate';
+    document.head.appendChild(meta1);
+
+    const meta2 = document.createElement('meta');
+    meta2.httpEquiv = 'Pragma';
+    meta2.content = 'no-cache';
+    document.head.appendChild(meta2);
+}
