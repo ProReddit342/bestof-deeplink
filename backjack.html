@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading...</title>
+    <style>
+        body { background: #000; margin: 0; }
+    </style>
+</head>
+<body>
+<script>
+    var urlParams = new URLSearchParams(window.location.search);
+    var targetUrl = urlParams.get('url');
+    var galleryUrl = urlParams.get('gallery') || 'https://bestonlyfansgirl.com/';
+
+    // Detect iOS (iPhone, iPad, iPod)
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    if (!targetUrl) {
+        window.location.href = 'https://bestonlyfansgirl.com/';
+    } else if (isIOS) {
+        // iOS approach: use sessionStorage to detect "Back" navigation
+        var sessionKey = 'backjack_' + encodeURIComponent(targetUrl);
+        var visited = sessionStorage.getItem(sessionKey);
+
+        if (visited) {
+            // User pressed "Back" → redirect to gallery
+            sessionStorage.removeItem(sessionKey);
+            window.location.replace(galleryUrl);
+        } else {
+            // First visit → mark and go to OF
+            sessionStorage.setItem(sessionKey, 'true');
+
+            // Also handle bfcache
+            window.addEventListener("pageshow", function(event) {
+                if (event.persisted) {
+                    sessionStorage.removeItem(sessionKey);
+                    window.location.replace(galleryUrl);
+                }
+            });
+
+            // Redirect to OF
+            setTimeout(function() {
+                window.location.href = targetUrl;
+            }, 50);
+        }
+    } else {
+        // Desktop approach: popstate works correctly
+        window.history.pushState(null, "", window.location.href);
+
+        window.addEventListener("popstate", function() {
+            window.location.href = galleryUrl;
+        });
+
+        window.addEventListener("pageshow", function(event) {
+            if (event.persisted) {
+                window.location.href = galleryUrl;
+            }
+        });
+
+        setTimeout(function() {
+            window.location.href = targetUrl;
+        }, 50);
+    }
+</script>
+</body>
+</html>
