@@ -1,26 +1,37 @@
 // =====================================================
-// Deeplink redirect script for iOS/Android
+// Deeplink redirect script - EXACT BOUNCY.AI COPY
 // go.bestonlyfansgirl.com -> opens in Safari WITHOUT dialog
 //
-// 2026-02-05: RESTORED original Bouncy.ai cascade approach
-// The simplified version (single x-safari-) was showing dialogs
-// because Cloud Function was too slow (4.4s API calls).
-// Now Cloud Function is instant, we can use proper cascade.
+// 2026-02-05: Copied from https://allmyspicylinks.com/js/deeplink.js
+// Key: Simple x-safari- approach, NO cascade, NO googlechrome://
 // =====================================================
 
 // Prevent page from being cached
-window.addEventListener('beforeunload', function() {});
+window.addEventListener('beforeunload', function() {
+    // This helps prevent page caching
+});
 
 // Global variables for analytics setup tracking
-let analyticsSetup = false;
+let analyticsSetup = false; // Flag to prevent duplicate setup
 
 // Function to setup analytics with validation
 function setupAnalytics(measurementId, metaPixelId) {
-    if (analyticsSetup) return;
+    // Prevent duplicate setup
+    if (analyticsSetup) {
+        return;
+    }
 
+    // Add Google Analytics if provided
     if (measurementId) {
-        if (/^\d+$/.test(measurementId)) measurementId = 'G-' + measurementId;
-        if (!/^G-[A-Z0-9]+$/.test(measurementId) && !/^UA-\d+-\d+$/.test(measurementId)) return;
+        // If measurementId is just numbers, add G- prefix
+        if (/^\d+$/.test(measurementId)) {
+            measurementId = 'G-' + measurementId;
+        }
+
+        // Validate GA ID format
+        if (!/^G-[A-Z0-9]+$/.test(measurementId) && !/^UA-\d+-\d+$/.test(measurementId)) {
+            return;
+        }
 
         const script = document.createElement('script');
         script.async = true;
@@ -31,11 +42,17 @@ function setupAnalytics(measurementId, metaPixelId) {
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
         gtag('config', measurementId);
+
+        // Make gtag available globally for debugging
         window.gtag = gtag;
     }
 
+    // Add Meta Pixel if provided
     if (metaPixelId) {
-        if (!/^\d+$/.test(metaPixelId)) return;
+        // Validate Meta Pixel ID (should be numbers only)
+        if (!/^\d+$/.test(metaPixelId)) {
+            return;
+        }
 
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -48,27 +65,35 @@ function setupAnalytics(measurementId, metaPixelId) {
 
         fbq('init', metaPixelId);
         fbq('track', 'PageView');
+
+        const noscript = document.createElement('noscript');
+        const img = document.createElement('img');
+        img.height = "1";
+        img.width = "1";
+        img.style.display = "none";
+        img.src = `https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1`;
+        noscript.appendChild(img);
+        document.head.appendChild(noscript);
+
+        // Make fbq available globally for debugging
         window.fbq = fbq;
     }
 
+    // Mark analytics as setup to prevent duplicates
     analyticsSetup = true;
 }
 
-// Main redirect logic - MUST be synchronous for proper timing!
+// Function to handle the redirect logic
 function handleRedirectLogic() {
     const urlParams = new URLSearchParams(window.location.search);
-    // destination is passed by Cloud Function (index.js) - no need for API calls here
     const redirectUrl = urlParams.get("destination") || "https://bestonlyfansgirl.com";
     const deeplinkId = urlParams.get("id");
     const measurementId = urlParams.get("ga");
     const metaPixelId = urlParams.get("pixel");
+    const backUrl = urlParams.get("backUrl");
 
-    // Setup analytics
+    // Setup analytics immediately
     setupAnalytics(measurementId, metaPixelId);
-
-    // =====================================================
-    // Device detection functions
-    // =====================================================
 
     const detectDevice = () => {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
@@ -77,44 +102,6 @@ function handleRedirectLogic() {
         return "desktop";
     };
 
-    const isSafari = () => {
-        const userAgent = navigator.userAgent;
-        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
-    };
-
-    const isMobileBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /CriOS|FxiOS|chrome.*mobile|firefox.*mobile|opera.*mobile/i.test(userAgent) && !/safari/i.test(userAgent);
-    };
-
-    const isFbBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /FBAN|FBAV/i.test(userAgent);
-    };
-
-    const isTelegramBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /AppleWebKit\/605\.1\.15/.test(userAgent) &&
-               /Mobile\/22E240/.test(userAgent) &&
-               /Safari\/604\.1/.test(userAgent) &&
-               !/CriOS|FxiOS/.test(userAgent);
-    };
-
-    // WebView detection - 45+ apps
-    const isWebView = () => {
-        const userAgent = navigator.userAgent;
-        return (
-            (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
-            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
-            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
-            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
-            isFbBrowser() ||
-            isTelegramBrowser() ||
-            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery/i.test(userAgent)
-        );
-    };
-
-    // Android Intent URL for Chrome
     const intentRedirect = (url) => {
         try {
             const targetUrl = new URL(url);
@@ -125,96 +112,45 @@ function handleRedirectLogic() {
         }
     };
 
-    // =====================================================
-    // REDIRECT LOGIC - ORIGINAL BOUNCY.AI CASCADE APPROACH
-    //
-    // iOS WebView (Reddit, Instagram, TikTok):
-    //   200ms → googlechrome://
-    //   400ms → x-safari-
-    //   600ms → https:// (fallback)
-    //
-    // iOS Normal (Safari, Chrome):
-    //   500ms → x-safari-
-    //   800ms → googlechrome://
-    //   1100ms → https:// (fallback)
-    //
-    // Android:
-    //   100ms/500ms → intent://
-    // =====================================================
-
     const redirect = () => {
         const device = detectDevice();
         const formattedRedirectUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
 
-        // DESKTOP - immediate redirect
         if (device === "desktop") {
+            // Desktop: Direct redirect
             window.location.href = formattedRedirectUrl;
-            return;
-        }
-
-        const isInWebView = isWebView();
-        const baseDelay = isInWebView ? 100 : 500;
-
-        // ANDROID
-        if (device === "android") {
+        } else if (device === "android") {
+            // Android: Open in Chrome using Intent URL
             setTimeout(() => {
                 intentRedirect(formattedRedirectUrl);
-            }, baseDelay);
-            return;
-        }
-
-        // iOS - CASCADE APPROACH
-        if (device === "ios") {
-            if (isInWebView) {
-                // AGGRESSIVE TIMINGS for WebView (Reddit, Instagram, etc.)
-                setTimeout(() => {
-                    const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                    window.location = `googlechrome://${chromeUrl}`;
-                }, 200);
-
-                setTimeout(() => {
-                    window.location = `x-safari-${formattedRedirectUrl}`;
-                }, 400);
-
-                setTimeout(() => {
-                    window.location = formattedRedirectUrl;
-                }, 600);
-            } else {
-                // STANDARD TIMINGS for normal browsers
-                setTimeout(() => {
-                    window.location = `x-safari-${formattedRedirectUrl}`;
-                }, 500);
-
-                setTimeout(() => {
-                    if (!isSafari()) {
-                        const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                        window.location = `googlechrome://${chromeUrl}`;
-                    }
-                }, 800);
-
-                setTimeout(() => {
-                    window.location = formattedRedirectUrl;
-                }, 1100);
-            }
+            }, 100);
+        } else if (device === "ios") {
+            // iOS: Open in Safari using x-safari- prefix
+            // EXACT Bouncy approach - simple, no cascade
+            setTimeout(() => {
+                window.location = `x-safari-${formattedRedirectUrl}`;
+            }, 100);
         }
     };
 
-    // Start redirect immediately
+    // Start the redirect process immediately
     redirect();
 }
 
-// Run on DOMContentLoaded
+// Run the redirect logic on both DOMContentLoaded and pageshow (for cached pages)
 document.addEventListener("DOMContentLoaded", handleRedirectLogic);
 
-// CRITICAL: Also run on pageshow for cached pages (back button)
+// CRITICAL: This catches when page is loaded from browser cache (back button)
 window.addEventListener("pageshow", function(event) {
     handleRedirectLogic();
 });
 
 // Additional cache prevention
-window.addEventListener("pagehide", function() {});
+window.addEventListener("pagehide", function() {
+    // Mark page as should not be cached
+});
 
-// Force no cache with meta tags
+// Force no cache with meta tag approach
 if (document.head) {
     const metaNoCache = document.createElement('meta');
     metaNoCache.httpEquiv = 'Cache-Control';
