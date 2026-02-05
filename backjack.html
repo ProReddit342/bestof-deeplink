@@ -34,7 +34,12 @@
             // First visit → mark and go to OF
             sessionStorage.setItem(sessionKey, 'true');
 
-            // Also handle bfcache
+            // CRITICAL: Push state so this page appears in browser history
+            // Without this, iOS Safari may not register a history entry
+            // and the Back button on OnlyFans will be inactive/grayed out
+            window.history.pushState({backjack: true}, '', window.location.href);
+
+            // Handle bfcache (back-forward cache)
             window.addEventListener("pageshow", function(event) {
                 if (event.persisted) {
                     sessionStorage.removeItem(sessionKey);
@@ -42,10 +47,16 @@
                 }
             });
 
-            // Redirect to OF
+            // Handle popstate (Back button press)
+            window.addEventListener("popstate", function() {
+                sessionStorage.removeItem(sessionKey);
+                window.location.replace(galleryUrl);
+            });
+
+            // Redirect to OF - 300ms gives browser time to register history entry
             setTimeout(function() {
                 window.location.href = targetUrl;
-            }, 50);
+            }, 300);
         }
     } else {
         // Desktop approach: popstate works correctly
@@ -63,7 +74,7 @@
 
         setTimeout(function() {
             window.location.href = targetUrl;
-        }, 50);
+        }, 300);
     }
 </script>
 </body>
