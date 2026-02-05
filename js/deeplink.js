@@ -2,8 +2,10 @@
 // Deeplink redirect script for iOS/Android
 // go.bestonlyfansgirl.com -> opens in Safari WITHOUT dialog
 //
-// 2026-02-05: Updated to match Bouncy.ai NEW simplified approach
-// Bouncy removed cascade and now uses ONLY x-safari- for iOS
+// 2026-02-05: RESTORED original Bouncy.ai cascade approach
+// The simplified version (single x-safari-) was showing dialogs
+// because Cloud Function was too slow (4.4s API calls).
+// Now Cloud Function is instant, we can use proper cascade.
 // =====================================================
 
 // Prevent page from being cached
@@ -75,6 +77,43 @@ function handleRedirectLogic() {
         return "desktop";
     };
 
+    const isSafari = () => {
+        const userAgent = navigator.userAgent;
+        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
+    };
+
+    const isMobileBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /CriOS|FxiOS|chrome.*mobile|firefox.*mobile|opera.*mobile/i.test(userAgent) && !/safari/i.test(userAgent);
+    };
+
+    const isFbBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /FBAN|FBAV/i.test(userAgent);
+    };
+
+    const isTelegramBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /AppleWebKit\/605\.1\.15/.test(userAgent) &&
+               /Mobile\/22E240/.test(userAgent) &&
+               /Safari\/604\.1/.test(userAgent) &&
+               !/CriOS|FxiOS/.test(userAgent);
+    };
+
+    // WebView detection - 45+ apps
+    const isWebView = () => {
+        const userAgent = navigator.userAgent;
+        return (
+            (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
+            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
+            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
+            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
+            isFbBrowser() ||
+            isTelegramBrowser() ||
+            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery/i.test(userAgent)
+        );
+    };
+
     // Android Intent URL for Chrome
     const intentRedirect = (url) => {
         try {
@@ -87,42 +126,76 @@ function handleRedirectLogic() {
     };
 
     // =====================================================
-    // REDIRECT LOGIC - BOUNCY.AI SIMPLIFIED APPROACH (Feb 2026)
+    // REDIRECT LOGIC - ORIGINAL BOUNCY.AI CASCADE APPROACH
     //
-    // Bouncy changed their code! Old cascade (googlechrome + x-safari + fallback)
-    // was removed. Now they use ONLY x-safari- for iOS.
+    // iOS WebView (Reddit, Instagram, TikTok):
+    //   200ms → googlechrome://
+    //   400ms → x-safari-
+    //   600ms → https:// (fallback)
     //
-    // OLD (Dec 2025): 3 setTimeout cascade for iOS WebView/Normal
-    // NEW (Feb 2026): Single x-safari- with 100ms delay
+    // iOS Normal (Safari, Chrome):
+    //   500ms → x-safari-
+    //   800ms → googlechrome://
+    //   1100ms → https:// (fallback)
     //
-    // If this doesn't work, we can rollback to cascade approach.
+    // Android:
+    //   100ms/500ms → intent://
     // =====================================================
 
     const redirect = () => {
         const device = detectDevice();
         const formattedRedirectUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
 
-        // DESKTOP - immediate redirect (unchanged)
+        // DESKTOP - immediate redirect
         if (device === "desktop") {
             window.location.href = formattedRedirectUrl;
             return;
         }
 
-        // ANDROID - Intent URL (unchanged from Bouncy)
+        const isInWebView = isWebView();
+        const baseDelay = isInWebView ? 100 : 500;
+
+        // ANDROID
         if (device === "android") {
             setTimeout(() => {
                 intentRedirect(formattedRedirectUrl);
-            }, 100);
+            }, baseDelay);
             return;
         }
 
-        // iOS - SIMPLIFIED APPROACH (matching Bouncy Feb 2026)
-        // Only x-safari- prefix, no googlechrome://, no cascade
-        // Works for ALL iOS: WebView (Reddit, Instagram) AND normal Safari
+        // iOS - CASCADE APPROACH
         if (device === "ios") {
-            setTimeout(() => {
-                window.location = `x-safari-${formattedRedirectUrl}`;
-            }, 100);
+            if (isInWebView) {
+                // AGGRESSIVE TIMINGS for WebView (Reddit, Instagram, etc.)
+                setTimeout(() => {
+                    const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
+                    window.location = `googlechrome://${chromeUrl}`;
+                }, 200);
+
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedRedirectUrl}`;
+                }, 400);
+
+                setTimeout(() => {
+                    window.location = formattedRedirectUrl;
+                }, 600);
+            } else {
+                // STANDARD TIMINGS for normal browsers
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedRedirectUrl}`;
+                }, 500);
+
+                setTimeout(() => {
+                    if (!isSafari()) {
+                        const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
+                        window.location = `googlechrome://${chromeUrl}`;
+                    }
+                }, 800);
+
+                setTimeout(() => {
+                    window.location = formattedRedirectUrl;
+                }, 1100);
+            }
         }
     };
 
