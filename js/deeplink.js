@@ -2,8 +2,8 @@
 // Deeplink redirect script for iOS/Android
 // go.bestonlyfansgirl.com -> opens in Safari WITHOUT dialog
 //
-// Based on Bouncy.ai implementation with ORIGINAL TIMINGS
-// CRITICAL: Do NOT change timings - they are calibrated for iOS WebView behavior
+// 2026-02-05: Updated to match Bouncy.ai NEW simplified approach
+// Bouncy removed cascade and now uses ONLY x-safari- for iOS
 // =====================================================
 
 // Prevent page from being cached
@@ -75,46 +75,6 @@ function handleRedirectLogic() {
         return "desktop";
     };
 
-    const isSafari = () => {
-        const userAgent = navigator.userAgent;
-        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
-    };
-
-    // Facebook browser detection
-    const isFbBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /FBAN|FBAV/i.test(userAgent);
-    };
-
-    // Telegram browser has unique signature
-    const isTelegramBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /AppleWebKit\/605\.1\.15/.test(userAgent) &&
-               /Mobile\/22E240/.test(userAgent) &&
-               /Safari\/604\.1/.test(userAgent) &&
-               !/CriOS|FxiOS/.test(userAgent);
-    };
-
-    // FULL WebView detection - 45+ apps (from Bouncy.ai)
-    // CRITICAL: Do NOT simplify this list!
-    const isWebView = () => {
-        const userAgent = navigator.userAgent;
-        return (
-            // iOS WebView API detection
-            (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
-            // iOS Standalone check
-            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
-            // webkit object presence
-            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
-            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
-            // Special browser detection
-            isFbBrowser() ||
-            isTelegramBrowser() ||
-            // 45+ apps by User-Agent (comprehensive list from Bouncy.ai)
-            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery|FBAN|FBAV/i.test(userAgent)
-        );
-    };
-
     // Android Intent URL for Chrome
     const intentRedirect = (url) => {
         try {
@@ -127,71 +87,42 @@ function handleRedirectLogic() {
     };
 
     // =====================================================
-    // REDIRECT LOGIC WITH ORIGINAL BOUNCY TIMINGS
-    // CRITICAL: These timings are calibrated for iOS WebView!
-    // Do NOT change without testing on real iPhone + Reddit app!
+    // REDIRECT LOGIC - BOUNCY.AI SIMPLIFIED APPROACH (Feb 2026)
+    //
+    // Bouncy changed their code! Old cascade (googlechrome + x-safari + fallback)
+    // was removed. Now they use ONLY x-safari- for iOS.
+    //
+    // OLD (Dec 2025): 3 setTimeout cascade for iOS WebView/Normal
+    // NEW (Feb 2026): Single x-safari- with 100ms delay
+    //
+    // If this doesn't work, we can rollback to cascade approach.
     // =====================================================
 
     const redirect = () => {
         const device = detectDevice();
         const formattedRedirectUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
 
-        // DESKTOP - immediate redirect
+        // DESKTOP - immediate redirect (unchanged)
         if (device === "desktop") {
             window.location.href = formattedRedirectUrl;
             return;
         }
 
-        const isInWebView = isWebView();
-
-        // ANDROID
+        // ANDROID - Intent URL (unchanged from Bouncy)
         if (device === "android") {
-            const baseDelay = isInWebView ? 100 : 500;
             setTimeout(() => {
                 intentRedirect(formattedRedirectUrl);
-            }, baseDelay);
+            }, 100);
             return;
         }
 
-        // iOS - URL scheme cascade with ORIGINAL BOUNCY TIMINGS
+        // iOS - SIMPLIFIED APPROACH (matching Bouncy Feb 2026)
+        // Only x-safari- prefix, no googlechrome://, no cascade
+        // Works for ALL iOS: WebView (Reddit, Instagram) AND normal Safari
         if (device === "ios") {
-            if (isInWebView) {
-                // =====================================================
-                // iOS WebView (Reddit, Instagram, TikTok, etc.)
-                // ORIGINAL TIMINGS: 200 / 400 / 600 ms
-                // =====================================================
-                setTimeout(() => {
-                    const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                    window.location = `googlechrome://${chromeUrl}`;
-                }, 200);  // Was 100ms - WRONG!
-
-                setTimeout(() => {
-                    window.location = `x-safari-${formattedRedirectUrl}`;
-                }, 400);  // Was 200ms - WRONG!
-
-                setTimeout(() => {
-                    window.location = formattedRedirectUrl;
-                }, 600);  // Was 400ms - WRONG!
-            } else {
-                // =====================================================
-                // iOS Normal browser (Safari, Chrome)
-                // ORIGINAL TIMINGS: 500 / 800 / 1100 ms
-                // =====================================================
-                setTimeout(() => {
-                    window.location = `x-safari-${formattedRedirectUrl}`;
-                }, 500);  // Was 300ms - WRONG!
-
-                setTimeout(() => {
-                    if (!isSafari()) {
-                        const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
-                        window.location = `googlechrome://${chromeUrl}`;
-                    }
-                }, 800);  // Was 600ms - WRONG!
-
-                setTimeout(() => {
-                    window.location = formattedRedirectUrl;
-                }, 1100);  // Was 900ms - WRONG!
-            }
+            setTimeout(() => {
+                window.location = `x-safari-${formattedRedirectUrl}`;
+            }, 100);
         }
     };
 
