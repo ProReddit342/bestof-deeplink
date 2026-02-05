@@ -59,49 +59,11 @@ function handleRedirect() {
     return;
   }
 
-  // iOS - cascade of URL schemes (Bouncy approach)
-  // Add unique timestamp to bypass iOS URL tracking
-  var sep = formattedUrl.indexOf('?') >= 0 ? '&' : '?';
-  var uniqueUrl = formattedUrl + sep + '_t=' + Date.now();
-
-  if (isInWebView) {
-    // AGGRESSIVE timings for WebView (Reddit, Instagram, etc.)
-    // Step 1: Try Chrome first (200ms)
-    setTimeout(function() {
-      var chromeUrl = formattedUrl.replace(/^https?:\/\//, '');
-      window.location = 'googlechrome://' + chromeUrl;
-    }, 200);
-
-    // Step 2: Try Safari (400ms)
-    setTimeout(function() {
-      window.location = 'x-safari-' + uniqueUrl;
-    }, 400);
-
-    // Step 3: Fallback direct redirect (600ms)
-    setTimeout(function() {
-      window.location = formattedUrl;
-    }, 600);
-  } else {
-    // NORMAL timings for regular browsers
-    // Step 1: Try Safari first (500ms)
-    setTimeout(function() {
-      window.location = 'x-safari-' + uniqueUrl;
-    }, 500);
-
-    // Step 2: Try Chrome if not Safari (800ms)
-    var isSafari = /safari/i.test(ua) && !/CriOS|FxiOS/i.test(ua);
-    if (!isSafari) {
-      setTimeout(function() {
-        var chromeUrl = formattedUrl.replace(/^https?:\/\//, '');
-        window.location = 'googlechrome://' + chromeUrl;
-      }, 800);
-    }
-
-    // Step 3: Fallback (1100ms)
-    setTimeout(function() {
-      window.location = formattedUrl;
-    }, 1100);
-  }
+  // iOS - simple x-safari- redirect (exactly like Bouncy)
+  // ONE call, 100ms delay, no cascade, no fallback
+  setTimeout(function() {
+    window.location = 'x-safari-' + formattedUrl;
+  }, 100);
 }
 
 // Run on DOMContentLoaded (not inline IIFE!)
