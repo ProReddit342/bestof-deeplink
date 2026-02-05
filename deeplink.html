@@ -6,22 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Redirecting...</title>
 
-    <script>
-        (function() {
-            var params = new URLSearchParams(window.location.search);
-            var dest = params.get('destination');
-            if (dest) {
-                // Detect desktop (not mobile/tablet)
-                var ua = navigator.userAgent || '';
-                var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-                if (!isMobile) {
-                    // Desktop - immediate redirect
-                    window.location.replace(dest);
-                }
-            }
-        })();
-    </script>
-
     <script src="js/deeplink.js"></script>
 
     <style>
