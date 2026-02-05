@@ -1,10 +1,11 @@
 // =====================================================
-// Deeplink redirect script - EXACT COPY OF BOUNCY.AI
+// Deeplink redirect script for iOS/Android
 // go.bestonlyfansgirl.com -> opens in Safari WITHOUT dialog
 //
-// 2026-02-05: EXACT BOUNCY COPY - simple approach works!
-// NO cascade, NO googlechrome://, NO isWebView detection
-// Just single x-safari- with 100ms delay
+// 2026-02-05: RESTORED original Bouncy.ai cascade approach
+// The simplified version (single x-safari-) was showing dialogs
+// because Cloud Function was too slow (4.4s API calls).
+// Now Cloud Function is instant, we can use proper cascade.
 // =====================================================
 
 // Prevent page from being cached
@@ -53,19 +54,22 @@ function setupAnalytics(measurementId, metaPixelId) {
     analyticsSetup = true;
 }
 
-// Main redirect logic
+// Main redirect logic - MUST be synchronous for proper timing!
 function handleRedirectLogic() {
     const urlParams = new URLSearchParams(window.location.search);
+    // destination is passed by Cloud Function (index.js) - no need for API calls here
     const redirectUrl = urlParams.get("destination") || "https://bestonlyfansgirl.com";
     const deeplinkId = urlParams.get("id");
     const measurementId = urlParams.get("ga");
     const metaPixelId = urlParams.get("pixel");
-    const backUrl = urlParams.get("backUrl");
 
-    // Setup analytics immediately
+    // Setup analytics
     setupAnalytics(measurementId, metaPixelId);
 
-    // Device detection
+    // =====================================================
+    // Device detection functions
+    // =====================================================
+
     const detectDevice = () => {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         if (/android/i.test(userAgent)) return "android";
@@ -73,7 +77,44 @@ function handleRedirectLogic() {
         return "desktop";
     };
 
-    // Android Intent URL
+    const isSafari = () => {
+        const userAgent = navigator.userAgent;
+        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
+    };
+
+    const isMobileBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /CriOS|FxiOS|chrome.*mobile|firefox.*mobile|opera.*mobile/i.test(userAgent) && !/safari/i.test(userAgent);
+    };
+
+    const isFbBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /FBAN|FBAV/i.test(userAgent);
+    };
+
+    const isTelegramBrowser = () => {
+        const userAgent = navigator.userAgent;
+        return /AppleWebKit\/605\.1\.15/.test(userAgent) &&
+               /Mobile\/22E240/.test(userAgent) &&
+               /Safari\/604\.1/.test(userAgent) &&
+               !/CriOS|FxiOS/.test(userAgent);
+    };
+
+    // WebView detection - 45+ apps
+    const isWebView = () => {
+        const userAgent = navigator.userAgent;
+        return (
+            (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
+            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
+            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
+            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
+            isFbBrowser() ||
+            isTelegramBrowser() ||
+            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery/i.test(userAgent)
+        );
+    };
+
+    // Android Intent URL for Chrome
     const intentRedirect = (url) => {
         try {
             const targetUrl = new URL(url);
@@ -85,37 +126,87 @@ function handleRedirectLogic() {
     };
 
     // =====================================================
-    // REDIRECT - EXACT BOUNCY.AI APPROACH
-    // Simple, no cascade, no googlechrome://
+    // REDIRECT LOGIC - ORIGINAL BOUNCY.AI CASCADE APPROACH
+    //
+    // iOS WebView (Reddit, Instagram, TikTok):
+    //   200ms → googlechrome://
+    //   400ms → x-safari-
+    //   600ms → https:// (fallback)
+    //
+    // iOS Normal (Safari, Chrome):
+    //   500ms → x-safari-
+    //   800ms → googlechrome://
+    //   1100ms → https:// (fallback)
+    //
+    // Android:
+    //   100ms/500ms → intent://
     // =====================================================
+
     const redirect = () => {
         const device = detectDevice();
         const formattedRedirectUrl = redirectUrl.startsWith('http') ? redirectUrl : `https://${redirectUrl}`;
 
+        // DESKTOP - immediate redirect
         if (device === "desktop") {
-            // Desktop: Direct redirect
             window.location.href = formattedRedirectUrl;
-        } else if (device === "android") {
-            // Android: Open in Chrome using Intent URL
+            return;
+        }
+
+        const isInWebView = isWebView();
+        const baseDelay = isInWebView ? 100 : 500;
+
+        // ANDROID
+        if (device === "android") {
             setTimeout(() => {
                 intentRedirect(formattedRedirectUrl);
-            }, 100);
-        } else if (device === "ios") {
-            // iOS: Open in Safari using x-safari- prefix
-            setTimeout(() => {
-                window.location = `x-safari-${formattedRedirectUrl}`;
-            }, 100);
+            }, baseDelay);
+            return;
+        }
+
+        // iOS - CASCADE APPROACH
+        if (device === "ios") {
+            if (isInWebView) {
+                // AGGRESSIVE TIMINGS for WebView (Reddit, Instagram, etc.)
+                setTimeout(() => {
+                    const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
+                    window.location = `googlechrome://${chromeUrl}`;
+                }, 200);
+
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedRedirectUrl}`;
+                }, 400);
+
+                setTimeout(() => {
+                    window.location = formattedRedirectUrl;
+                }, 600);
+            } else {
+                // STANDARD TIMINGS for normal browsers
+                setTimeout(() => {
+                    window.location = `x-safari-${formattedRedirectUrl}`;
+                }, 500);
+
+                setTimeout(() => {
+                    if (!isSafari()) {
+                        const chromeUrl = formattedRedirectUrl.replace(/^https?:\/\//, '');
+                        window.location = `googlechrome://${chromeUrl}`;
+                    }
+                }, 800);
+
+                setTimeout(() => {
+                    window.location = formattedRedirectUrl;
+                }, 1100);
+            }
         }
     };
 
-    // Start the redirect process immediately
+    // Start redirect immediately
     redirect();
 }
 
-// Run the redirect logic on both DOMContentLoaded and pageshow (for cached pages)
+// Run on DOMContentLoaded
 document.addEventListener("DOMContentLoaded", handleRedirectLogic);
 
-// CRITICAL: This catches when page is loaded from browser cache (back button)
+// CRITICAL: Also run on pageshow for cached pages (back button)
 window.addEventListener("pageshow", function(event) {
     handleRedirectLogic();
 });
