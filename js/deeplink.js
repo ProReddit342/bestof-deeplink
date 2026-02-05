@@ -1,3 +1,11 @@
+// =====================================================
+// Deeplink redirect script - EXACT BOUNCY.AI COPY
+// go.bestonlyfansgirl.com -> opens in Safari WITHOUT dialog
+//
+// 2026-02-05: Copied from https://allmyspicylinks.com/js/deeplink.js
+// Key: Simple x-safari- approach, NO cascade, NO googlechrome://
+// =====================================================
+
 // Prevent page from being cached
 window.addEventListener('beforeunload', function() {
     // This helps prevent page caching
@@ -12,19 +20,19 @@ function setupAnalytics(measurementId, metaPixelId) {
     if (analyticsSetup) {
         return;
     }
-    
+
     // Add Google Analytics if provided
     if (measurementId) {
         // If measurementId is just numbers, add G- prefix
         if (/^\d+$/.test(measurementId)) {
             measurementId = 'G-' + measurementId;
         }
-        
+
         // Validate GA ID format
         if (!/^G-[A-Z0-9]+$/.test(measurementId) && !/^UA-\d+-\d+$/.test(measurementId)) {
             return;
         }
-        
+
         const script = document.createElement('script');
         script.async = true;
         script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
@@ -34,7 +42,7 @@ function setupAnalytics(measurementId, metaPixelId) {
         function gtag(){dataLayer.push(arguments);}
         gtag('js', new Date());
         gtag('config', measurementId);
-        
+
         // Make gtag available globally for debugging
         window.gtag = gtag;
     }
@@ -45,7 +53,7 @@ function setupAnalytics(measurementId, metaPixelId) {
         if (!/^\d+$/.test(metaPixelId)) {
             return;
         }
-        
+
         !function(f,b,e,v,n,t,s)
         {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
         n.callMethod.apply(n,arguments):n.queue.push(arguments)};
@@ -66,50 +74,20 @@ function setupAnalytics(measurementId, metaPixelId) {
         img.src = `https://www.facebook.com/tr?id=${metaPixelId}&ev=PageView&noscript=1`;
         noscript.appendChild(img);
         document.head.appendChild(noscript);
-        
+
         // Make fbq available globally for debugging
         window.fbq = fbq;
     }
-    
+
     // Mark analytics as setup to prevent duplicates
     analyticsSetup = true;
-}
-
-// Function to determine redirect URL from path
-function getRedirectFromPath() {
-    const path = window.location.pathname;
-    const pathParts = path.replace(/^\//, '').split('/');
-    const firstPart = pathParts[0];
-
-    // Skip if accessing static files
-    if (!firstPart || firstPart === 'deeplink.html' || firstPart.includes('.')) {
-        return { url: 'https://bestonlyfansgirl.com', id: null };
-    }
-
-    // Subreddit deeplink: /r/subreddit-slug
-    if (firstPart === 'r' && pathParts[1]) {
-        const subredditSlug = pathParts[1];
-        return {
-            url: 'https://bestonlyfansgirl.com/r/gallery?ref=reddit&via=deeplink&sub=' + subredditSlug,
-            id: 'bestonlyfansgirl.com__r_' + subredditSlug
-        };
-    }
-
-    // Model deeplink: /slug → trap page
-    return {
-        url: 'https://bestonlyfansgirl.com/rk/' + firstPart,
-        id: 'bestonlyfansgirl.com__' + firstPart
-    };
 }
 
 // Function to handle the redirect logic
 function handleRedirectLogic() {
     const urlParams = new URLSearchParams(window.location.search);
-
-    // Try to get destination from query param (old way) or from path (new way)
-    const pathData = getRedirectFromPath();
-    const redirectUrl = urlParams.get("destination") || pathData.url;
-    const deeplinkId = urlParams.get("id") || pathData.id;
+    const redirectUrl = urlParams.get("destination") || "https://bestonlyfansgirl.com";
+    const deeplinkId = urlParams.get("id");
     const measurementId = urlParams.get("ga");
     const metaPixelId = urlParams.get("pixel");
     const backUrl = urlParams.get("backUrl");
@@ -117,54 +95,11 @@ function handleRedirectLogic() {
     // Setup analytics immediately
     setupAnalytics(measurementId, metaPixelId);
 
-    // Back button hijacking removed from aggressive behavior to prevent double browser kicks
-
-    // No special setup needed for first-time visitors anymore
-    // Back button detection handles everything
-
-    let dl_found = false;
-
     const detectDevice = () => {
         const userAgent = navigator.userAgent || navigator.vendor || window.opera;
         if (/android/i.test(userAgent)) return "android";
         if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) return "ios";
         return "desktop";
-    };
-
-    const isSafari = () => {
-        const userAgent = navigator.userAgent;
-        return /safari/i.test(userAgent) && !/CriOS|FxiOS/i.test(userAgent);
-    };
-
-    const isMobileBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /CriOS|FxiOS|chrome.*mobile|firefox.*mobile|opera.*mobile/i.test(userAgent) && !/safari/i.test(userAgent);
-    };
-
-    const isFbBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /FBAN|FBAV/i.test(userAgent);
-    };
-
-    const isTelegramBrowser = () => {
-        const userAgent = navigator.userAgent;
-        return /AppleWebKit\/605\.1\.15/.test(userAgent) && 
-               /Mobile\/22E240/.test(userAgent) && 
-               /Safari\/604\.1/.test(userAgent) &&
-               !/CriOS|FxiOS/.test(userAgent);
-    };
-
-    const isWebView = () => {
-        const userAgent = navigator.userAgent;
-        return (
-            (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
-            (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(userAgent)) ||
-            (typeof window.webkit !== 'undefined' && !/CriOS/.test(userAgent)) ||
-            (window.webkit && window.webkit.messageHandlers && !/CriOS/.test(userAgent)) ||
-            isFbBrowser() ||
-            isTelegramBrowser() ||
-            /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora|Pocket|Flipboard|Feedly|Inoreader|NewsBlur|TheOldReader|Bloglovin|Netvibes|MyYahoo|StartPage|DuckDuckGo|Ecosia|Qwant|Brave|Vivaldi|SamsungBrowser|MiuiBrowser|UCBrowser|Opera Mini|Opera Touch|Samsung Internet|QQBrowser|BaiduBrowser|Maxthon|Puffin|Dolphin|Ghostery/i.test(userAgent)
-        );
     };
 
     const intentRedirect = (url) => {
@@ -191,13 +126,14 @@ function handleRedirectLogic() {
             }, 100);
         } else if (device === "ios") {
             // iOS: Open in Safari using x-safari- prefix
+            // EXACT Bouncy approach - simple, no cascade
             setTimeout(() => {
                 window.location = `x-safari-${formattedRedirectUrl}`;
             }, 100);
         }
     };
 
-        // Start the redirect process immediately (no back button hijacking in aggressive mode)
+    // Start the redirect process immediately
     redirect();
 }
 
@@ -220,14 +156,14 @@ if (document.head) {
     metaNoCache.httpEquiv = 'Cache-Control';
     metaNoCache.content = 'no-cache, no-store, must-revalidate';
     document.head.appendChild(metaNoCache);
-    
+
     const metaPragma = document.createElement('meta');
     metaPragma.httpEquiv = 'Pragma';
     metaPragma.content = 'no-cache';
     document.head.appendChild(metaPragma);
-    
+
     const metaExpires = document.createElement('meta');
     metaExpires.httpEquiv = 'Expires';
     metaExpires.content = '0';
     document.head.appendChild(metaExpires);
-} 
+}
