@@ -2,27 +2,131 @@
 <html><head>
 <meta charset="UTF-8">
 <meta name="robots" content="noindex,nofollow">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Redirecting...</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}
+.l{width:48px;height:48px;border:5px solid #084c58;border-bottom-color:transparent;border-radius:50%;animation:r 1s linear infinite}
+@keyframes r{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="l"></div>
 <script>
-(function(){
-  var d = new URLSearchParams(location.search).get('destination');
-  if (!d) { location.href = 'https://bestonlyfansgirl.com'; return; }
-  var ua = navigator.userAgent || '';
-  if (/iPad|iPhone|iPod/.test(ua)) {
-    var sep = d.indexOf('?') >= 0 ? '&' : '?';
-    location = 'x-safari-' + d + sep + '_t=' + Date.now();
-  } else if (/android/i.test(ua)) {
-    try {
-      var u = new URL(d);
-      location.href = 'intent://' + u.host + u.pathname + u.search +
-        '#Intent;scheme=' + u.protocol.replace(':','') +
-        ';package=com.android.chrome;S.browser_fallback_url=' +
-        encodeURIComponent(d) + ';end';
-    } catch(e) { location.href = d; }
-  } else {
-    location.href = d;
+// Cache prevention
+window.addEventListener('beforeunload', function(){});
+window.addEventListener('pagehide', function(){});
+
+function handleRedirect() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var d = urlParams.get('destination');
+  if (!d) { window.location.href = 'https://bestonlyfansgirl.com'; return; }
+
+  var ua = navigator.userAgent || navigator.vendor || '';
+  var formattedUrl = d.startsWith('http') ? d : 'https://' + d;
+
+  // Device detection
+  var isAndroid = /android/i.test(ua);
+  var isIOS = /iPad|iPhone|iPod/.test(ua) && !window.MSStream;
+
+  // WebView detection (Reddit, Instagram, TikTok, etc.)
+  var isInWebView = (
+    (window.hasOwnProperty('webkit') && window.webkit.hasOwnProperty('messageHandlers')) ||
+    (navigator.hasOwnProperty('standalone') && !navigator.standalone && !/CriOS/.test(ua)) ||
+    (typeof window.webkit !== 'undefined' && !/CriOS/.test(ua)) ||
+    /FBAN|FBAV/i.test(ua) ||
+    /Instagram|Twitter|LinkedIn|Pinterest|Snapchat|WhatsApp|Messenger|Line|WeChat|Viber|KakaoTalk|Discord|Slack|TikTok|Reddit|Tumblr|Medium|Quora/i.test(ua)
+  );
+
+  // DESKTOP - direct redirect
+  if (!isIOS && !isAndroid) {
+    window.location.href = formattedUrl;
+    return;
   }
-})();
+
+  // ANDROID - intent URL
+  if (isAndroid) {
+    var baseDelay = isInWebView ? 100 : 500;
+    setTimeout(function() {
+      try {
+        var u = new URL(formattedUrl);
+        window.location.href = 'intent://' + u.host + u.pathname + u.search +
+          '#Intent;scheme=' + u.protocol.replace(':','') +
+          ';package=com.android.chrome;S.browser_fallback_url=' +
+          encodeURIComponent(formattedUrl) + ';end';
+      } catch(e) { window.location = formattedUrl; }
+    }, baseDelay);
+    return;
+  }
+
+  // iOS - cascade of URL schemes (Bouncy approach)
+  // Add unique timestamp to bypass iOS URL tracking
+  var sep = formattedUrl.indexOf('?') >= 0 ? '&' : '?';
+  var uniqueUrl = formattedUrl + sep + '_t=' + Date.now();
+
+  if (isInWebView) {
+    // AGGRESSIVE timings for WebView (Reddit, Instagram, etc.)
+    // Step 1: Try Chrome first (200ms)
+    setTimeout(function() {
+      var chromeUrl = formattedUrl.replace(/^https?:\/\//, '');
+      window.location = 'googlechrome://' + chromeUrl;
+    }, 200);
+
+    // Step 2: Try Safari (400ms)
+    setTimeout(function() {
+      window.location = 'x-safari-' + uniqueUrl;
+    }, 400);
+
+    // Step 3: Fallback direct redirect (600ms)
+    setTimeout(function() {
+      window.location = formattedUrl;
+    }, 600);
+  } else {
+    // NORMAL timings for regular browsers
+    // Step 1: Try Safari first (500ms)
+    setTimeout(function() {
+      window.location = 'x-safari-' + uniqueUrl;
+    }, 500);
+
+    // Step 2: Try Chrome if not Safari (800ms)
+    var isSafari = /safari/i.test(ua) && !/CriOS|FxiOS/i.test(ua);
+    if (!isSafari) {
+      setTimeout(function() {
+        var chromeUrl = formattedUrl.replace(/^https?:\/\//, '');
+        window.location = 'googlechrome://' + chromeUrl;
+      }, 800);
+    }
+
+    // Step 3: Fallback (1100ms)
+    setTimeout(function() {
+      window.location = formattedUrl;
+    }, 1100);
+  }
+}
+
+// Run on DOMContentLoaded (not inline IIFE!)
+document.addEventListener('DOMContentLoaded', handleRedirect);
+
+// Also run on pageshow (catches back-forward cache)
+window.addEventListener('pageshow', function(event) {
+  handleRedirect();
+});
+
+// Anti-cache meta tags
+if (document.head) {
+  var m1 = document.createElement('meta');
+  m1.httpEquiv = 'Cache-Control';
+  m1.content = 'no-cache, no-store, must-revalidate';
+  document.head.appendChild(m1);
+  var m2 = document.createElement('meta');
+  m2.httpEquiv = 'Pragma';
+  m2.content = 'no-cache';
+  document.head.appendChild(m2);
+  var m3 = document.createElement('meta');
+  m3.httpEquiv = 'Expires';
+  m3.content = '0';
+  document.head.appendChild(m3);
+}
 </script>
-<style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;background:#f5f5f5}.l{width:48px;height:48px;border:5px solid #084c58;border-bottom-color:transparent;border-radius:50%;animation:r 1s linear infinite}@keyframes r{to{transform:rotate(360deg)}}</style>
-</head><body><div class="l"></div></body></html>
+</body>
+</html>
