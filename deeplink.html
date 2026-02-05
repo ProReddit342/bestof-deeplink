@@ -9,7 +9,8 @@
   if (!d) { location.href = 'https://bestonlyfansgirl.com'; return; }
   var ua = navigator.userAgent || '';
   if (/iPad|iPhone|iPod/.test(ua)) {
-    location = 'x-safari-' + d;
+    var sep = d.indexOf('?') >= 0 ? '&' : '?';
+    location = 'x-safari-' + d + sep + '_t=' + Date.now();
   } else if (/android/i.test(ua)) {
     try {
       var u = new URL(d);
